@@ -1,175 +1,172 @@
-let pkgs = import <nixpkgs> {};
-    repo = import /home/a2/Projects/nixpkgs {};
-    dirt = import /home/a2/Projects/nixpkgs.dirty {};
+{ config, pkgs, ... }:
 
-    phng = pkgs.haskell-ng;
-    rhng = repo.haskell-ng;
-
-    pcghc = phng.compiler;
-    pcpak = phng.packages;
-    rcghc = rhng.compiler;
-    rcpak = rhng.packages;
-
-    ghc710c = rcghc.ghc7101; 
-    ghc710p = rcpak.ghc7101;
-
-    rghc784c = rcghc.ghc784;
-    rghc784p = rcpak.ghc784;
-    pghc784c = pcghc.ghc784;
-    pghc784p = pcpak.ghc784;
-
-    ghcjsc = rcghc.ghcjs;
-    ghcjsp = rcpak.ghcjs;
+let repo = import /home/ace/src/internet/nixpkgs {};
+      ob = import /home/ace/src/internet/obelisk {};
 in
-
-{ config, lib, pkgs, ... }:
 
 {
   imports =
-    [
+    [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
-  boot.loader.grub = {
-    enable = true;
-    version = 2;
-    device = "/dev/sda";
-  };
-
-  networking = { 
-    hostName = "import";
-    hostId = "96540107";
-    wireless.enable = false;
-    useDHCP = false;
-    interfaceMonitor.enable = false;
-    wicd.enable = true;
-    extraHosts = ''12.227.104.109 localhost'';
-  };
-
-  # Select internationalisation properties.
-  i18n = {
-    consoleFont = "lat9w-16";
-    consoleKeyMap = "us";
-    defaultLocale = "en_US.UTF-8";
-  };
-
-  environment.systemPackages = with pkgs; with emacs24Packages; with aspellDicts;
-  [
-    wget
-    nox
-    stdenv
-    binutils
-    patchelf
-    unzip
-    zlib
-    glib
-    htop
-    redshift
-    git
-    aspell
-    gnumake
-    mupdf
-    pghc784p.cabal2nix
-    psmisc
-    jack2
-    jack_capture
-    mplayer
-    xvidcap
-    repo.nix-repl
-
-    emacs
-    haskellMode
-    #structured-haskell-mode
-
-    firefoxWrapper
-    chromium
-    irssi
-    repo.pidgin
-    
-    dmenu
-    rghc784c
-    rghc784p.cabal-install
-    rghc784p.Agda
-#    repo.AgdaSheaves
-    repo.urweb
-    j
-    repo.leiningen
-
-    haskellngPackages.xmobar
-    haskellngPackages.xmonad
-    haskellngPackages.xmonad-contrib
-    haskellngPackages.xmonad-extras
-
-    #leksah
-
-    cudatoolkit6
-    #accelerate-cuda
-    
-    wireshark
-
-#    repo.emacs24PackagesNg.agda2-mode
-
+  # Use the systemd-boot EFI boot loader.
+  boot.initrd.luks.devices = [
+    {
+      name = "root";
+      device = "/dev/sda3";
+      preLVM = true;
+    }
   ];
 
-  nix = {
-    binaryCaches = ["https://hydra.nixos.org" "http://hydra.nixos.org" "https://cache.nixos.org" "http://cache.nixos.org" ]; # "http://hydra.cryp.to/" "https://hydra.cryp.to/" "https://ryantrinkle.com:5443" ];
-    trustedBinaryCaches = ["https://hydra.nixos.org" "http://hydra.nixos.org" "https://cache.nixos.org" "http://cache.nixos.org" ]; # "http://hydra.cryp.to/" "https://hydra.cryp.to/" "https://ryantrinkle.com:5443" ];
-    buildCores = 8;
-    maxJobs = 1;
-  };
-  
-  time.timeZone = "US/Pacific";
+  boot.loader.grub.device = "/dev/sda";  
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
-  services = {
-    printing.enable = true;
-    xserver = {
-      enable = true;
-        layout = "us";
-      displayManager.slim = {
-        defaultUser = "a2";
-      };
-      windowManager = {
-        default = "xmonad";
-        xmonad = {
-          enable = true;
-          enableContribAndExtras = true;
-        };
-      };
-      videoDrivers = [ "nvidia" ];
-    };
-    virtualboxHost.enable = true;
+  boot.extraModprobeConfig = ''
+    options snd_hda_intel enable=0,1
+  '';
+
+  boot.blacklistedKernelModules = [ "snd_pcsp" ];
+
+  hardware.pulseaudio.enable = true;
+  hardware.pulseaudio.support32Bit = true;
+  hardware.pulseaudio.systemWide = true;
+
+  nix.binaryCaches = [ "https://cache.nixos.org/" "https://nixcache.reflex-frp.org" ];
+  nix.binaryCachePublicKeys = [ "ryantrinkle.com-1:JJiAKaRv9mWgpVAz8dwewnZe0AzzEAzPkagE9SP5NWI=" ];
+
+  nix.envVars = {
+    NIX_GITHUB_PRIVATE_USERNAME = "sheganinans";
+    NIX_GITHUB_PRIVATE_PASSWORD = "218ea2aa56ecebf0bafa659f14c23da21ee78870";
   };
 
-  hardware.opengl.driSupport32Bit = true;
-
-  users = { 
-    extraUsers.a2 = {
-      isNormalUser = true;
-      extraGroups = ["wheel"];
-      uid = 1001;
-    };
-    extraGroups = {
-      wireshark.gid = 500;
-      vboxusers.members = [ "a2" ];
-    };
-    defaultUserShell = "/var/run/current-system/sw/bin/zsh";
-  };
-
-  security = {
-    setuidOwners = [
-      { program = "dumpcap";
-        owner = "root";
-        group = "wireshark";
-        setuid = true;
-        setgid = false;
-        permissions = "u+rx,g+x";
-      }
-    ];
-    sudo.wheelNeedsPassword = false;
-  };
-
-  programs.zsh.enable = true;
-
+  nixpkgs.config.pulseaudio = true;
   nixpkgs.config.allowUnfree = true;
+
+  networking.hostName = "ace"; # Define your hostname.
+  networking.networkmanager.enable = true;
+
+  # Select internationalisation properties.
+  # i18n = {
+  #   consoleFont = "Lat2-Terminus16";
+  #   consoleKeyMap = "us";
+  #   defaultLocale = "en_US.UTF-8";
+  # };
+
+  # Set your time zone.
+  time.timeZone = "America/Los_Angeles";
+
+  # List packages installed in system profile. To search by name, run:
+  # $ nix-env -qaP | grep wget
+  environment.systemPackages = with pkgs; [
+    ob.command
+
+    binutils
+    cabal-install
+    repo.discord
+    emacs
+    ffmpeg
+    gcc
+    geoclue
+    ghc
+    git
+    glib
+    gnumake
+    htop
+    hub
+    hunspell
+    repo.j
+    libreoffice
+    libopus
+    libsodium
+    #mozpkgs.latest.rustChannels.nightly.rust
+    #mozpkgs.latest.rustChannels.nightly.rust-src
+    #mozpkgs.latest.rustChannels.stable.rust
+    #mozpkgs.latest.rustChannels.stable.rust-src
+    repo.nix-repl
+    repo.nox
+    repo.openssl
+    repo.openssl.dev
+    patchelf
+    pkgconfig
+    repo.quaternion
+    redshift
+    repo.signal-desktop
+    stack
+    stdenv
+    repo.sublime3
+    thunderbird
+    tdesktop
+    repo.telegram-cli
+    unoconv
+    unzip
+    vim
+    repo.vivaldi
+    wget
+    wireshark
+    repo.wire-desktop
+    youtube-dl
+    zlib
+  ];
+
+  # Some programs need SUID wrappers, can be configured further or are
+  # started in user sessions.
+  programs.bash.enableCompletion = true;
+  # programs.mtr.enable = true;
+  # programs.gnupg.agent = { enable = true; enableSSHSupport = true; };
+
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+  # services.openssh.enable = true;
+
+  # Open ports in the firewall.
+  # networking.firewall.allowedTCPPorts = [ ... ];
+  # networking.firewall.allowedUDPPorts = [ ... ];
+  # Or disable the firewall altogether.
+  # networking.firewall.enable = false;
+
+  # Enable CUPS to print documents.
+  services.printing.enable = true;
+
+  services.nixosManual.showManual = true;
+
+  # Enable the X11 windowing system.
+  services.xserver = {
+    enable = true;
+    layout = "us";
+    # services.xserver.xkbOptions = "eurosign:e";
+
+    # Enable touchpad support.
+    libinput.enable = true;
+
+    # Enable the KDE Desktop Environment.
+    displayManager.sddm.enable = true;
+    desktopManager.plasma5.enable = true;
+  };
+
+  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.extraUsers.ace = {
+    name = "ace";
+    isNormalUser = true;
+    group = "users";
+    extraGroups = [
+      "wheel" "disk" "audio" "video"
+      "networkmanager" "systemd-journal"
+    ];
+    createHome = true;
+    uid = 1000;
+    home = "/home/ace";
+    shell = "/run/current-system/sw/bin/bash";
+  };
+
+  system.autoUpgrade.enable = true;
+
+  # This value determines the NixOS release with which your system is to be
+  # compatible, in order to avoid breaking some software such as database
+  # servers. You should change this only after NixOS release notes say you
+  # should.
+  system.stateVersion = "18.03"; # Did you read the comment?
 
 }
