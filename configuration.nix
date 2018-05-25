@@ -74,7 +74,7 @@ in
     glib
     gnumake
     htop
-    hub
+    gitAndTools.hub
     hunspell
     repo.j
     libreoffice
